@@ -1,0 +1,11 @@
+module qs.core
+
+singleton Theme 1.0 Theme.qml
+singleton UiState 1.0 UiState.qml
+singleton Audio 1.0 Audio.qml
+singleton Media 1.0 Media.qml
+singleton Keybinds 1.0 Keybinds.qml
+singleton Clipboard 1.0 Clipboard.qml
+singleton Launcher 1.0 Launcher.qml
+singleton Notifs 1.0 Notifs.qml
+singleton Wallpapers 1.0 Wallpapers.qml

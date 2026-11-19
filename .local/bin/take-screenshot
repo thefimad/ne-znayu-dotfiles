@@ -1,0 +1,39 @@
+#!/usr/bin/env bash
+# Take a screenshot, save it, and put it on both clipboards.
+#
+#   take-screenshot region   # drag a region
+#   take-screenshot output   # whole monitor
+#   take-screenshot window   # focused window
+#
+# Wayland clients read the image from wl-copy; XWayland clients read it from
+# x11-clipboard-image, because the compositor's X11 clipboard bridge is broken.
+set -u
+
+mode="${1:-region}"
+outdir="$HOME/Pictures/Screenshots"
+mkdir -p "$outdir"
+
+case "$mode" in
+    region) set -- -m region ;;
+    output) set -- -m active -m output ;;
+    window) set -- -m window -m active ;;
+    *)
+        echo "usage: take-screenshot {region|output|window}" >&2
+        exit 2
+        ;;
+esac
+
+marker="${XDG_RUNTIME_DIR:-/tmp}/take-screenshot-marker"
+: > "$marker"
+
+# hyprshot exits non-zero even on success, so ignore its return code.
+hyprshot "$@" -o "$outdir" >/dev/null 2>&1 || true
+
+file=$(find "$outdir" -maxdepth 1 -type f -name '*.png' -newer "$marker" \
+    -printf '%T@ %p\n' 2>/dev/null | sort -n | tail -1 | cut -d' ' -f2-)
+rm -f "$marker"
+
+# No new file means the selection was cancelled.
+[[ -n "$file" && -f "$file" ]] || exit 0
+
+"$HOME/.local/bin/copy-image" "$file"

@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+# Put an image file on both clipboards: Wayland (wl-copy) and X11
+# (x11-clipboard-image, for XWayland clients).
+set -u
+
+file="${1:-}"
+mime="${2:-image/png}"
+if [[ -z "$file" || ! -f "$file" ]]; then
+    echo "usage: copy-image <file> [mime]" >&2
+    exit 2
+fi
+
+runtime="${XDG_RUNTIME_DIR:-/tmp}"
+pidfile="$runtime/copy-image-x11.pid"
+
+if [[ -f "$pidfile" ]]; then
+    kill "$(cat "$pidfile")" 2>/dev/null || true
+    rm -f "$pidfile"
+fi
+
+wl-copy --type "$mime" < "$file" 2>/dev/null || true
+
+setsid "$HOME/.local/bin/x11-clipboard-image" "$file" \
+    >/dev/null 2>&1 < /dev/null &
+echo $! > "$pidfile"

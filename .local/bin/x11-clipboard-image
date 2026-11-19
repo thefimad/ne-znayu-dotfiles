@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+"""Own the X11 CLIPBOARD selection with a PNG image.
+
+Hyprland's XWayland clipboard bridge does not sync in this setup, so native
+Wayland clients read the image from wl-copy while XWayland clients read it
+from this process. It stays alive until the next screenshot replaces it.
+"""
+from __future__ import annotations
+
+import os
+import sys
+
+os.environ["GDK_BACKEND"] = "x11"
+
+import gi
+
+gi.require_version("Gtk", "3.0")
+gi.require_version("Gdk", "3.0")
+from gi.repository import Gdk, GdkPixbuf, Gtk
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print("usage: x11-clipboard-image <file.png>", file=sys.stderr)
+        return 2
+
+    path = os.path.abspath(sys.argv[1])
+    if not os.path.isfile(path):
+        print(f"x11-clipboard-image: no such file: {path}", file=sys.stderr)
+        return 1
+
+    Gtk.init([])
+    clipboard = Gtk.Clipboard.get(Gdk.SELECTION_CLIPBOARD)
+    pixbuf = GdkPixbuf.Pixbuf.new_from_file(path)
+    clipboard.set_image(pixbuf)
+    clipboard.set_can_store(None)
+
+    # Keep serving the selection. The wrapper kills this process when a new
+    # screenshot is taken or the session ends.
+    Gtk.main()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,73 @@
+#!/usr/bin/env python3
+"""Generate ~/.cache/quickshell/keybinds.json from modules/keybinds.lua.
+
+Parses the metadata helper calls:
+    b("SUPER + K", "SYSTEM", "Keybind cheatsheet", hl.dsp.exec_cmd(...))
+
+Run on every save of keybinds.lua (the Quickshell viewer also re-runs it).
+Exits quietly if the source file does not exist yet.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import re
+import sys
+import tempfile
+import time
+from pathlib import Path
+
+HOME = Path.home()
+SOURCE = Path(os.environ.get("HYPR_BINDS_SRC", HOME / ".config/hypr/modules/keybinds.lua"))
+OUTPUT = Path(os.environ.get("HYPR_BINDS_OUT", HOME / ".cache/quickshell/keybinds.json"))
+
+CALL = re.compile(r'^\s*b\(\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,\s*"([^"]*)"\s*,')
+CATEGORY_ORDER = ["LAUNCH", "WINDOWS", "WORKSPACES", "SYSTEM", "MEDIA", "SCREENSHOT"]
+
+
+def main() -> int:
+    if not SOURCE.exists():
+        print(f"hypr-binds-gen: missing {SOURCE}", file=sys.stderr)
+        return 1
+
+    binds = []
+    for line in SOURCE.read_text(encoding="utf-8").splitlines():
+        match = CALL.match(line)
+        if not match:
+            continue
+        key, category, description = match.groups()
+        binds.append(
+            {
+                "key": key.strip(),
+                "category": category.strip().upper(),
+                "description": description.strip(),
+            }
+        )
+
+    binds.sort(key=lambda item: (
+        CATEGORY_ORDER.index(item["category"])
+        if item["category"] in CATEGORY_ORDER
+        else len(CATEGORY_ORDER),
+        item["key"],
+    ))
+
+    payload = {
+        "generated": int(time.time()),
+        "count": len(binds),
+        "binds": binds,
+    }
+
+    OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    handle, temp_path = tempfile.mkstemp(dir=OUTPUT.parent, prefix=".keybinds.", suffix=".json")
+    with os.fdopen(handle, "w", encoding="utf-8") as stream:
+        json.dump(payload, stream, ensure_ascii=False, indent=2)
+        stream.write("\n")
+    os.replace(temp_path, OUTPUT)
+
+    print(f"hypr-binds-gen: wrote {len(binds)} binds to {OUTPUT}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
